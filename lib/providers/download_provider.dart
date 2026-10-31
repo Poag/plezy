@@ -17,6 +17,7 @@ import '../database/download_collection_operations.dart';
 import '../database/download_operations.dart';
 import '../services/background_work_diagnostics_service.dart';
 import '../services/download_manager_service.dart';
+import '../services/live_activity_service.dart';
 import '../services/api_cache.dart';
 import '../services/download_artwork_service.dart';
 import '../services/download_storage_service.dart';
@@ -629,11 +630,62 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     }
 
     if (ownedByActiveProfile) safeNotifyListeners();
+    if (ownedByActiveProfile) _syncLiveActivity();
+  }
+
+  /// Mirrors the active profile's aggregate download state to the iOS Live
+  /// Activity (a no-op on other platforms). Called on every owned progress
+  /// update so the lock-screen/Dynamic-Island view stays live.
+  void _syncLiveActivity() {
+    var activeCount = 0;
+    var queuedCount = 0;
+    var downloadedBytes = 0;
+    var totalBytes = 0;
+    var speedBytesPerSec = 0.0;
+    String? activeTitle;
+    String? queuedTitle;
+    for (final entry in _downloads.entries) {
+      if (!_ownsDownloadKey(entry.key)) continue;
+      final progress = entry.value;
+      switch (progress.status) {
+        case DownloadStatus.downloading:
+          activeCount++;
+          speedBytesPerSec += progress.speed;
+          downloadedBytes += progress.downloadedBytes;
+          totalBytes += progress.totalBytes;
+          activeTitle ??= _metadata[entry.key]?.title;
+        case DownloadStatus.queued:
+          queuedCount++;
+          downloadedBytes += progress.downloadedBytes;
+          totalBytes += progress.totalBytes;
+          queuedTitle ??= _metadata[entry.key]?.title;
+        case DownloadStatus.paused:
+        case DownloadStatus.completed:
+        case DownloadStatus.failed:
+        case DownloadStatus.cancelled:
+        case DownloadStatus.partial:
+          break;
+      }
+    }
+    unawaited(
+      LiveActivityService.instance.syncState(
+        LiveActivityDownloadState(
+          activeCount: activeCount,
+          queuedCount: queuedCount,
+          overallProgress: totalBytes == 0 ? 0 : downloadedBytes / totalBytes,
+          downloadedBytes: downloadedBytes,
+          totalBytes: totalBytes,
+          speedBytesPerSec: speedBytesPerSec,
+          primaryTitle: activeTitle ?? queuedTitle,
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
     BackgroundWorkDiagnosticsService.instance.unbindActivitySource(downloadActivitySnapshot);
+    unawaited(LiveActivityService.instance.endAll());
     _offlineSource?.removeListener(_onOfflineSourceChanged);
     _progressSubscription?.cancel();
     _deletionProgressSubscription?.cancel();
