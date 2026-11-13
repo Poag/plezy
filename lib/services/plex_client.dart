@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../utils/isolate_helper.dart';
 import '../utils/json_utils.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -116,20 +117,26 @@ const _plexVideoHlsProtocol = 'hls';
 /// 1.43; servers older than 1.22 fail the decision request itself regardless
 /// of container, so no version gate. PMS 1.43 has no AV1 encoder and answers
 /// an AV1-led list with the same encode it picked before AV1 was offered.
-String _plexHlsVodVideoTranscodeTarget() =>
+///
+/// [restrictAudioToAc3] drops `aac`/`mp3` from the audio half of the target
+/// (#3054): with the source audio codec no longer accepted as a copy *or*
+/// encode output, the only way left to satisfy the request is an audio-only
+/// encode to ac3/eac3, while the video codec list — untouched — keeps video
+/// eligible for Direct Stream.
+String _plexHlsVodVideoTranscodeTarget({bool restrictAudioToAc3 = false}) =>
     'add-transcode-target(type=videoProfile&context=streaming'
     '&protocol=hls&container=mp4'
     '&videoCodec=${VideoDecodeCapabilities.transcodeVideoCodecs.map((codec) => codec.id).join('%2C')}'
-    '&audioCodec=aac%2Cac3%2Ceac3%2Cmp3)';
+    '&audioCodec=${restrictAudioToAc3 ? 'ac3%2Ceac3' : 'aac%2Cac3%2Ceac3%2Cmp3'})';
 
 /// Fallback VOD target for a server whose decision does not honour the fMP4
 /// container: H.264-only MPEG-TS, the combination Plex's own legacy clients
 /// request. HEVC stays out — in a TS target it is reachable only as the
 /// broken encode output described on [_plexHlsVodVideoTranscodeTarget].
-const _plexHlsVodTsVideoTranscodeTarget =
+String _plexHlsVodTsVideoTranscodeTarget({bool restrictAudioToAc3 = false}) =>
     'add-transcode-target(type=videoProfile&context=streaming'
     '&protocol=hls&container=mpegts&videoCodec=h264'
-    '&audioCodec=aac%2Cac3%2Ceac3%2Cmp3)';
+    '&audioCodec=${restrictAudioToAc3 ? 'ac3%2Ceac3' : 'aac%2Cac3%2Ceac3%2Cmp3'})';
 
 /// Live TV target for Original quality: MPEG-TS with the broadcast codecs.
 /// Those sessions are copy-dominant (TS→TS remux — hevc/mpeg2video here are
@@ -2853,6 +2860,13 @@ class PlexClient
   /// the file itself must not be served: the user refused the source's codec
   /// (#2443), or the server already refused the file (HTTP 500).
   ///
+  /// [restrictAudioToAc3] (#3054) narrows the transcode target's audio codecs
+  /// to ac3/eac3 and sets `directStreamAudio=0`, so a source whose audio PMS
+  /// would otherwise direct-stream unchanged is instead encoded to AC3 —
+  /// while the video codec list, untouched, keeps the video itself on Direct
+  /// Stream. Callers also pass [withholdDirectPlay] alongside this so Original
+  /// quality cannot shortcut straight to a raw Direct Play of the file.
+  ///
   /// Deliberately no `offset` request parameter: the start URL always
   /// describes the full title and the player seeks in-band by requesting the
   /// segment at the resume position (`Media(start:)`). Pre-warming the
@@ -2873,6 +2887,7 @@ class PlexClient
     MediaSubtitleTrack? selectedSubtitleTrack,
     int? partId,
     bool withholdDirectPlay = false,
+    bool restrictAudioToAc3 = false,
   }) async {
     try {
       await selectSubtitleStreamForBurn(partId: partId, track: selectedSubtitleTrack);
@@ -2887,6 +2902,7 @@ class PlexClient
         selectedSubtitleTrack: selectedSubtitleTrack,
         useTsFallbackTarget: useTsFallbackTarget,
         withholdDirectPlay: withholdDirectPlay,
+        restrictAudioToAc3: restrictAudioToAc3,
       );
 
       final primary = await _runTranscodeDecision(
@@ -3085,11 +3101,14 @@ class PlexClient
     MediaSubtitleTrack? selectedSubtitleTrack,
     bool useTsFallbackTarget = false,
     bool withholdDirectPlay = false,
+    bool restrictAudioToAc3 = false,
   }) {
     final isOriginal = preset.isOriginal;
     final selectedInternalSubtitle = _selectedInternalSubtitleForHls(selectedSubtitleTrack);
     final clientProfileExtra = _buildPlexHlsClientProfileExtra(
-      videoTranscodeTarget: useTsFallbackTarget ? _plexHlsVodTsVideoTranscodeTarget : _plexHlsVodVideoTranscodeTarget(),
+      videoTranscodeTarget: useTsFallbackTarget
+          ? _plexHlsVodTsVideoTranscodeTarget(restrictAudioToAc3: restrictAudioToAc3)
+          : _plexHlsVodVideoTranscodeTarget(restrictAudioToAc3: restrictAudioToAc3),
       maxVideoBitrateKbps: !isOriginal ? preset.videoBitrateKbps : null,
     );
 
@@ -3132,7 +3151,12 @@ class PlexClient
       // Null exactly for the original preset.
       if (preset.videoResolution != null) 'videoResolution': preset.videoResolution!,
       if (preset.videoQuality != null) 'videoQuality': preset.videoQuality!.toString(),
-      'directStreamAudio': '1',
+      // 0 only for the forced-AC3 path (#3054): paired with the narrowed
+      // audioCodec list above, this is what turns "transcode" into "copy the
+      // video, encode only the audio" rather than a full re-encode — PMS
+      // still owns the actual video direct-stream-vs-encode call via
+      // `directStream`/the video codec list, untouched here.
+      'directStreamAudio': restrictAudioToAc3 ? '0' : '1',
       'mediaBufferSize': '102400',
       'session': transcodeSessionId,
       // `subtitles` is the only subtitle knob this endpoint honours. Which
@@ -3167,6 +3191,7 @@ class PlexClient
     int? audioStreamId,
     MediaSubtitleTrack? selectedSubtitleTrack,
     bool useTsFallbackTarget = false,
+    bool restrictAudioToAc3 = false,
   }) {
     return _buildTranscodeParams(
       ratingKey: ratingKey,
@@ -3178,6 +3203,7 @@ class PlexClient
       audioStreamId: audioStreamId,
       selectedSubtitleTrack: selectedSubtitleTrack,
       useTsFallbackTarget: useTsFallbackTarget,
+      restrictAudioToAc3: restrictAudioToAc3,
     );
   }
 
@@ -3755,9 +3781,18 @@ class PlexClient
       final isTrack = options.metadata.kind == MediaKind.track;
       final audioPreset = options.audioQualityPreset ?? AudioQualityPreset.original;
       final sourceCodecRefused = !isTrack && _sourceCodecRefused(data);
+      final resolvedAudioId = isTrack
+          ? null
+          : (carriedAudioTrack == null
+                ? _resolveAudioStreamId(options.selectedAudioStreamId, data.mediaInfo)
+                : carriedAudioStreamId);
+      final forceAc3SurroundAudio = !isTrack && _audioNeedsForcedAc3Transcode(data, resolvedAudioId);
       final wantTranscode = isTrack
           ? !audioPreset.isOriginal
-          : sourceCodecRefused || options.forceTranscode || _presetNeedsTranscode(options.qualityPreset, data);
+          : sourceCodecRefused ||
+                options.forceTranscode ||
+                forceAc3SurroundAudio ||
+                _presetNeedsTranscode(options.qualityPreset, data);
       if (wantTranscode && options.sessionIdentifier != null && options.transcodeSessionId != null) {
         if (isTrack) {
           final result = await buildMusicTranscodeStartPath(
@@ -3786,9 +3821,6 @@ class PlexClient
           return _transcodeFallbackResult(data, result.outcome, options);
         }
 
-        final resolvedAudioId = carriedAudioTrack == null
-            ? _resolveAudioStreamId(options.selectedAudioStreamId, data.mediaInfo)
-            : carriedAudioStreamId;
         final requestedSubtitleTrack = _resolveTranscodeSubtitleTrack(data.mediaInfo, options.preferredSubtitleTrack);
         final result = await buildTranscodeStartPath(
           ratingKey: options.metadata.id,
@@ -3800,7 +3832,8 @@ class PlexClient
           audioStreamId: resolvedAudioId,
           selectedSubtitleTrack: requestedSubtitleTrack,
           partId: data.mediaInfo?.partId,
-          withholdDirectPlay: sourceCodecRefused || options.forceTranscode,
+          withholdDirectPlay: sourceCodecRefused || options.forceTranscode || forceAc3SurroundAudio,
+          restrictAudioToAc3: forceAc3SurroundAudio,
         );
 
         // A transcode that cannot carry the requested caption is not the outcome we asked for. The
@@ -3886,6 +3919,30 @@ class PlexClient
     final codec = RankedVideoCodec.fromServerCodec(_selectedVersion(data)?.videoCodec);
     if (codec == null || !VideoDecodeCapabilities.isRefusedByUser(codec)) return false;
     appLogger.i('Source codec ${codec.id} is refused in settings; transcoding');
+    return true;
+  }
+
+  /// Whether [SettingsService.forceAc3SurroundAudio] should force a
+  /// server-side audio-only transcode to AC3/EAC3 (#3054). Some HDMI ARC
+  /// receivers decode compressed AC3/EAC3 but not raw multichannel PCM; when
+  /// the client reports multichannel support, Plex direct-streams a
+  /// multichannel source (e.g. 5.1 AAC) untouched, the client decodes it to
+  /// PCM, and ARC then has to downmix that PCM to stereo — silently losing
+  /// the surround mix. Stereo/mono sources and sources already in ac3/eac3
+  /// are left alone: ARC already carries those as intended.
+  bool _audioNeedsForcedAc3Transcode(PlexVideoPlaybackData data, int? resolvedAudioId) {
+    final settings = SettingsService.instanceOrNull;
+    if (settings == null || !settings.read(SettingsService.forceAc3SurroundAudio)) return false;
+    final tracks = data.mediaInfo?.audioTracks;
+    if (tracks == null || tracks.isEmpty) return false;
+    final track = resolvedAudioId == null
+        ? tracks.firstWhereOrNull((t) => t.selected) ?? tracks.first
+        : tracks.firstWhereOrNull((t) => t.id == resolvedAudioId);
+    final channels = track?.channels ?? 0;
+    if (track == null || channels <= 2) return false;
+    final codec = track.codec?.toLowerCase();
+    if (codec == 'ac3' || codec == 'eac3') return false;
+    appLogger.i('Forcing audio-only transcode to AC3: source audio is $codec/$channels ch');
     return true;
   }
 

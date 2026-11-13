@@ -108,6 +108,7 @@ class PlaybackSettingsScreen extends StatelessWidget {
                 // Only a stereo fold mixes the center away; any fold can clip.
                 if (channelLimit == AudioChannelLimit.stereo) _downmixCenterBoostTile(),
                 if (channelLimit != AudioChannelLimit.original) _downmixNormalizeTile(),
+                _forceAc3SurroundAudioTile(),
                 _maxVolumeTile(),
               ],
             ),
@@ -706,6 +707,18 @@ class PlaybackSettingsScreen extends StatelessWidget {
     icon: Symbols.bolt_rounded,
     title: t.settings.directPlayCoveredQuality,
     subtitle: t.settings.directPlayCoveredQualityDescription,
+  );
+
+  // Plex-only effect (#3054): the universal transcode decision is the only
+  // mechanism this acts on. Distinct from Audio Channels above — that one
+  // reshapes already-decoded PCM on-device; this one asks the server to
+  // re-encode the stream itself, so the client never receives multichannel
+  // PCM in the first place.
+  Widget _forceAc3SurroundAudioTile() => SettingSwitchTile(
+    pref: SettingsService.forceAc3SurroundAudio,
+    icon: Symbols.surround_sound_rounded,
+    title: t.settings.forceAc3SurroundAudio,
+    subtitle: t.settings.forceAc3SurroundAudioDescription,
   );
 
   Widget _videoCodecsTile() => SettingChecklistTile(

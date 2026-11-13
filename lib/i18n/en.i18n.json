@@ -426,6 +426,8 @@
     "audioChannelLimitSurround51Description": "Mix 7.1 down to 5.1 for TVs and receivers that only take 5.1 PCM. Passthrough is unaffected.",
     "audioChannelLimitStereo": "Stereo",
     "audioChannelLimitStereoDescription": "Mix down to two channels for stereo speakers or headphones. Turns passthrough off.",
+    "forceAc3SurroundAudio": "Force AC3 for Surround Audio",
+    "forceAc3SurroundAudioDescription": "Ask Plex to transcode multichannel audio your receiver can't decode to AC3, while keeping video on Direct Play. Fixes silent downmixing over HDMI ARC. Plex only.",
     "downmixCenterBoost": "Center Channel Boost",
     "downmixCenterBoostValue": "${db} dB",
     "downmixCenterBoostLabel": "Boost (dB)",
