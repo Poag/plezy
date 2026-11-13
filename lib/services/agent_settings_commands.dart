@@ -419,6 +419,8 @@ class AgentSettingsCommands {
       if (pref == SettingsService.crashReporting)
         'note': 'Controls event submission; reporting must also be compiled into this build.',
       if (pref == SettingsService.directPlayCoveredQuality) 'note': 'Only Plex uses this startup quality decision.',
+      if (pref == SettingsService.forceAc3SurroundAudio)
+        'note': 'Only Plex acts on this; it asks the server to transcode multichannel audio to AC3.',
       if (pref == SettingsService.watchPartyRelayUrl || pref == SettingsService.mpvConfigText)
         'valueRequiresExplicitGet': true,
     };
