@@ -782,6 +782,15 @@ class SettingsService extends BaseSharedPreferencesService {
   /// equivalent direct-play-vs-transcode call server-side.
   static const directPlayCoveredQuality = BoolPref('direct_play_covered_quality', defaultValue: true);
 
+  /// Force a server-side audio-only transcode to AC3/EAC3 for multichannel
+  /// audio, leaving the video stream on Direct Play/Direct Stream (#3054).
+  /// For HDMI ARC receivers that decode compressed AC3/EAC3 but not raw
+  /// multichannel PCM: without this, a multichannel source direct-streams
+  /// untouched, the client decodes it to PCM, and ARC downmixes that PCM to
+  /// stereo, silently losing the surround mix. Plex-only by design: Plex's
+  /// universal transcode decision is the only mechanism this acts on.
+  static const forceAc3SurroundAudio = BoolPref('force_ac3_surround_audio', defaultValue: false);
+
   /// Ids of the [RankedVideoCodec]s the user refused: the server transcodes
   /// them instead of sending them, and never picks them as a transcode output
   /// (#2443). Desktop-only because desktop has no hardware-decode probe; kept
@@ -1557,6 +1566,7 @@ class SettingsService extends BaseSharedPreferencesService {
     audioNormalization,
     audioChannelLimit,
     audioDownmixNormalize,
+    forceAc3SurroundAudio,
     appLocale,
     autoPip,
     maxVolume,

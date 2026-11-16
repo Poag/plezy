@@ -1200,6 +1200,47 @@ void main() {
     expect(profile, isNot(contains('mpeg2video')));
   });
 
+  test('restrictAudioToAc3 narrows the transcode target to ac3/eac3 and forces an audio transcode (#3054)', () {
+    final client = makeClient((_) async => http.Response('not used', 500));
+    addTearDown(client.close);
+
+    final params = client.buildTranscodeParamsForTesting(
+      ratingKey: '42',
+      mediaIndex: 0,
+      preset: TranscodeQualityPreset.p720_3mbps,
+      sessionIdentifier: 'session-id',
+      transcodeSessionId: 'transcode-id',
+      restrictAudioToAc3: true,
+    );
+
+    // Audio must transcode even though this preset's video target would
+    // otherwise happily copy an already-compatible audio codec.
+    expect(params['directStreamAudio'], '0');
+
+    final profile = params['X-Plex-Client-Profile-Extra'];
+    expect(
+      profile,
+      contains(
+        'add-transcode-target(type=videoProfile&context=streaming'
+        '&protocol=hls&container=mp4&videoCodec=av1%2Chevc%2Ch264'
+        '&audioCodec=ac3%2Ceac3)',
+      ),
+    );
+    // The video codec list is untouched by the restriction — only the audio
+    // half narrows, so video stays eligible for Direct Stream.
+    expect(profile, isNot(contains('aac')));
+    expect(profile, isNot(contains('mp3')));
+
+    final unrestricted = client.buildTranscodeParamsForTesting(
+      ratingKey: '42',
+      mediaIndex: 0,
+      preset: TranscodeQualityPreset.p720_3mbps,
+      sessionIdentifier: 'session-id',
+      transcodeSessionId: 'transcode-id',
+    );
+    expect(unrestricted['directStreamAudio'], '1');
+  });
+
   test('non-original presets send the resolution and quality caps their labels promise', () {
     final client = makeClient((_) async => http.Response('not used', 500));
     addTearDown(client.close);
