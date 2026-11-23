@@ -1226,6 +1226,12 @@ class Translations$settings$en {
 	/// en: 'Mix down to two channels for stereo speakers or headphones. Turns passthrough off.'
 	String get audioChannelLimitStereoDescription => 'Mix down to two channels for stereo speakers or headphones. Turns passthrough off.';
 
+	/// en: 'Force AC3 for Surround Audio'
+	String get forceAc3SurroundAudio => 'Force AC3 for Surround Audio';
+
+	/// en: 'Ask Plex to transcode multichannel audio your receiver can't decode to AC3, while keeping video on Direct Play. Fixes silent downmixing over HDMI ARC. Plex only.'
+	String get forceAc3SurroundAudioDescription => 'Ask Plex to transcode multichannel audio your receiver can\'t decode to AC3, while keeping video on Direct Play. Fixes silent downmixing over HDMI ARC. Plex only.';
+
 	/// en: 'Center Channel Boost'
 	String get downmixCenterBoost => 'Center Channel Boost';
 
@@ -8526,6 +8532,8 @@ extension on Translations {
 			'settings.audioChannelLimitSurround51Description' => 'Mix 7.1 down to 5.1 for TVs and receivers that only take 5.1 PCM. Passthrough is unaffected.',
 			'settings.audioChannelLimitStereo' => 'Stereo',
 			'settings.audioChannelLimitStereoDescription' => 'Mix down to two channels for stereo speakers or headphones. Turns passthrough off.',
+			'settings.forceAc3SurroundAudio' => 'Force AC3 for Surround Audio',
+			'settings.forceAc3SurroundAudioDescription' => 'Ask Plex to transcode multichannel audio your receiver can\'t decode to AC3, while keeping video on Direct Play. Fixes silent downmixing over HDMI ARC. Plex only.',
 			'settings.downmixCenterBoost' => 'Center Channel Boost',
 			'settings.downmixCenterBoostValue' => ({required Object db}) => '${db} dB',
 			'settings.downmixCenterBoostLabel' => 'Boost (dB)',
@@ -8632,10 +8640,10 @@ extension on Translations {
 			'themeEditor.slots.bg' => 'Background',
 			'themeEditor.slots.surface' => 'Surface',
 			'themeEditor.slots.outline' => 'Outline',
-			'themeEditor.slots.text' => 'Text',
-			'themeEditor.slots.textMuted' => 'Secondary text',
 			_ => null,
 		} ?? switch (path) {
+			'themeEditor.slots.text' => 'Text',
+			'themeEditor.slots.textMuted' => 'Secondary text',
 			'themeEditor.slots.accent' => 'Accent',
 			'themeEditor.opacity' => 'Opacity',
 			'themeEditor.hexHint' => '#RRGGBB or #AARRGGBB',
@@ -9146,10 +9154,10 @@ extension on Translations {
 			'profiles.failedToVerifyPin' => 'Failed to verify PIN.',
 			'profiles.newProfile' => 'New profile',
 			'profiles.profileNameHint' => 'e.g. Guests, Kids, Family Room',
-			'profiles.pinProtectionOptional' => 'PIN protection (optional)',
-			'profiles.pinExplain' => '4-digit PIN required to switch profiles.',
 			_ => null,
 		} ?? switch (path) {
+			'profiles.pinProtectionOptional' => 'PIN protection (optional)',
+			'profiles.pinExplain' => '4-digit PIN required to switch profiles.',
 			'profiles.continueButton' => 'Continue',
 			'profiles.pinsDontMatch' => 'PINs don\'t match',
 			'profiles.tokenIdentityMismatch' => 'The Plex profile token resolved to an unexpected server',
@@ -9660,10 +9668,10 @@ extension on Translations {
 			'liveTv.editRuleAction' => 'Edit',
 			'liveTv.recordingRuleUpdated' => 'Recording rule updated',
 			'liveTv.guideReloadRequested' => 'Guide refresh requested',
-			'liveTv.guideReloadFailed' => 'Couldn\'t refresh the guide',
-			'liveTv.rulesProcessRequested' => 'Rule re-evaluation requested',
 			_ => null,
 		} ?? switch (path) {
+			'liveTv.guideReloadFailed' => 'Couldn\'t refresh the guide',
+			'liveTv.rulesProcessRequested' => 'Rule re-evaluation requested',
 			'liveTv.rulesProcessFailed' => 'Couldn\'t re-evaluate recording rules',
 			'liveTv.recordShow' => 'Record show',
 			'liveTv.recordSettings.startEarly' => 'Start early (seconds)',
@@ -10174,10 +10182,10 @@ extension on Translations {
 			'performanceOverlay.maxFall' => 'MaxFALL',
 			'performanceOverlay.cacheUsed' => 'Cache Used',
 			'performanceOverlay.cacheLimit' => 'Cache Limit',
-			'performanceOverlay.speed' => 'Speed',
-			'performanceOverlay.player' => 'Player',
 			_ => null,
 		} ?? switch (path) {
+			'performanceOverlay.speed' => 'Speed',
+			'performanceOverlay.player' => 'Player',
 			'performanceOverlay.playMethod' => 'Play Method',
 			'performanceOverlay.memory' => 'Memory',
 			'performanceOverlay.uiFps' => 'UI FPS',
